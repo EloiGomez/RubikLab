@@ -1,5 +1,7 @@
 # RubikLab
 
+**[Try it online](https://EloiGomez.github.io/RubikLab/)**
+
 A Rubik's cube simulator, a two-phase (Kociemba) solver and a visualizer for the group structure of the cube. Everything runs in the browser; there is nothing to build.
 
 ## What's inside
