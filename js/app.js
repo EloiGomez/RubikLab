@@ -171,7 +171,6 @@
       if (it.tag === 'user') history.push(it.m);
       updateColors();
       if (it.tag === 'sol') { solIndex++; renderSolution(); }
-      if (!queue.length || duration() > 0) refresh();
     }
     busy = false;
     refresh();
