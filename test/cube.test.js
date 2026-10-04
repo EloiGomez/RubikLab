@@ -3,7 +3,7 @@ const assert = typeof require !== 'undefined' ? require('assert') : window.asser
 const R = typeof RC !== 'undefined' ? RC : require('../js/cube.js');
 const { Cube, MOVES, FACELETS, NORMALS, FACE_LETTERS } = R;
 
-// 1. El modelo algebraico coincide con una rotación física de la capa
+// 1. The algebraic model matches a physical layer rotation
 MOVES.forEach((mv, m) => {
   const face = FACE_LETTERS[(m / 3) | 0], k = m % 3;
   const turns = k === 0 ? [true] : k === 1 ? [true, true] : [false];
@@ -18,11 +18,11 @@ MOVES.forEach((mv, m) => {
     });
     colors = next;
   }
-  assert.deepStrictEqual(R.toFacelets(mv), colors, 'geometría vs modelo: ' + R.moveName(m));
+  assert.deepStrictEqual(R.toFacelets(mv), colors, 'geometry vs model: ' + R.moveName(m));
 });
-console.log('ok geometría == modelo algebraico (18 movimientos)');
+console.log('ok geometry == algebraic model (18 moves)');
 
-// 2. Axiomas básicos
+// 2. Basic axioms
 for (let f = 0; f < 6; f++) {
   const base = MOVES[f * 3];
   assert(base.multiply(base).multiply(base).multiply(base).isSolved(), 'X^4 = e');
@@ -34,9 +34,9 @@ const ru = R.applyAlg(new Cube(), R.parseAlg('R U'));
 assert.strictEqual(R.order(ru), 105);
 let p = ru, n = 1; while (!p.isSolved()) { p = p.multiply(ru); n++; }
 assert.strictEqual(n, 105);
-console.log('ok orden(R U) = 105 (fórmula y fuerza bruta)');
+console.log('ok order(R U) = 105 (formula and brute force)');
 
-// 3. Invariantes del grupo en estados aleatorios
+// 3. Group invariants on random states
 for (let t = 0; t < 200; t++) {
   const c = R.applyAlg(new Cube(), R.randomScramble(30));
   assert.strictEqual(c.co.reduce((a, b) => a + b), c.co.reduce((a, b) => a + b) % 3 === 0 ? c.co.reduce((a, b) => a + b) : -1);
@@ -44,13 +44,13 @@ for (let t = 0; t < 200; t++) {
   assert.strictEqual(R.permParity(c.cp), R.permParity(c.ep));
   assert(c.multiply(c.inverse()).isSolved());
   let q = c, k = 1; while (!q.isSolved()) { q = q.multiply(c); k++; }
-  assert.strictEqual(k, R.order(c), 'orden');
+  assert.strictEqual(k, R.order(c), 'order');
 }
-console.log('ok invariantes + orden fórmula == fuerza bruta');
+console.log('ok invariants + order formula == brute force');
 
-// 4. Conmutador de movimientos disjuntos y álgebra de algoritmos
+// 4. Algorithm algebra
 const alg = R.parseAlg("R U R' U'");
 assert(R.applyAlg(R.applyAlg(new Cube(), alg), R.invertAlg(alg)).isSolved());
 assert.strictEqual(R.algToString(R.simplifyAlg(R.parseAlg("R R U U' R'"))), 'R');
-console.log('ok algoritmos');
+console.log('ok algorithms');
 })();

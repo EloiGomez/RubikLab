@@ -1,9 +1,9 @@
-/* Modelo algebraico del cubo de Rubik.
+/* Algebraic model of the Rubik's cube.
  *
- * Un estado es un elemento del grupo G = (Z3^7 x Z2^11) ⋊ ((A8 x A12) ⋊ Z2):
- *   cp[i] = qué esquina ocupa la posición i,  co[i] = su orientación (mod 3)
- *   ep[i] = qué arista ocupa la posición i,   eo[i] = su orientación (mod 2)
- * El producto a.multiply(b) significa "aplicar a y luego b".
+ * A state is an element of the group G = (Z3^7 x Z2^11) ⋊ ((A8 x A12) ⋊ Z2):
+ *   cp[i] = which corner sits at position i,  co[i] = its orientation (mod 3)
+ *   ep[i] = which edge sits at position i,    eo[i] = its orientation (mod 2)
+ * The product a.multiply(b) means "apply a, then b".
  */
 const RC = (function () {
   const CORNER_NAMES = ['URF', 'UFL', 'ULB', 'UBR', 'DFR', 'DLF', 'DBL', 'DRB'];
@@ -56,7 +56,7 @@ const RC = (function () {
     }
   }
 
-  // ---- Generadores: los seis giros de cara de 90° (sentido horario) ----
+  // ---- Generators: the six 90° clockwise face turns ----
   const BASE = {
     U: new Cube(ci('UBR URF UFL ULB DFR DLF DBL DRB'), [0, 0, 0, 0, 0, 0, 0, 0],
                 ei('UB UR UF UL DR DF DL DB FR FL BL BR'), new Array(12).fill(0)),
@@ -72,7 +72,7 @@ const RC = (function () {
                 ei('UR UF UL BR DR DF DL BL FR FL UB DB'), [0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 1, 1]),
   };
 
-  // MOVES[face*3 + k]: face en orden U R F D L B; k = 0 (X), 1 (X2), 2 (X')
+  // MOVES[face*3 + k]: face in order U R F D L B; k = 0 (X), 1 (X2), 2 (X')
   const MOVES = [];
   for (const f of FACE_LETTERS) {
     let p = new Cube();
@@ -86,7 +86,7 @@ const RC = (function () {
     const toks = str.replace(/[()\[\],]/g, ' ').trim().split(/\s+/).filter(Boolean);
     for (const t of toks) {
       const m = /^([URFDLB])(2|'|2')?$/.exec(t);
-      if (!m) throw new Error('Movimiento no válido: ' + t);
+      if (!m) throw new Error('Invalid move: ' + t);
       const f = FACE_LETTERS.indexOf(m[1]);
       out.push(f * 3 + (m[2] === '2' || m[2] === "2'" ? 1 : m[2] === "'" ? 2 : 0));
     }
@@ -99,7 +99,7 @@ const RC = (function () {
     for (const m of moves) c = c.multiply(MOVES[m]);
     return c;
   }
-  // Une giros consecutivos de la misma cara (R R -> R2, R R' -> nada)
+  // Merge consecutive turns of the same face (R R -> R2, R R' -> nothing)
   function simplifyAlg(moves) {
     const out = [];
     for (const m of moves) {
@@ -115,7 +115,7 @@ const RC = (function () {
     return out;
   }
 
-  // ---- Teoría de grupos: ciclos, orden, paridad ----
+  // ---- Group theory: cycles, order, parity ----
   function cycles(perm, ori, mod) {
     const seen = new Array(perm.length).fill(false), res = [];
     for (let i = 0; i < perm.length; i++) {
@@ -132,7 +132,7 @@ const RC = (function () {
   function permParity(perm) {
     return (perm.length - cycles(perm, new Array(perm.length).fill(0), 1).length) % 2;
   }
-  // Orden del elemento: cada ciclo de longitud L con torsión t aporta L (o L*mod si t != 0)
+  // Element order: each cycle of length L with twist t contributes L (or L*mod if t != 0)
   function order(cube) {
     let o = 1;
     for (const c of cycles(cube.cp, cube.co, 3)) o = lcm(o, c.twist ? c.length * 3 : c.length);
@@ -163,7 +163,7 @@ const RC = (function () {
     return out;
   }
 
-  // ---- Geometría: 54 pegatinas (orden Kociemba: U R F D L B, 9 por cara) ----
+  // ---- Geometry: 54 stickers (Kociemba order: U R F D L B, 9 per face) ----
   const NORMALS = { U: [0, 1, 0], R: [1, 0, 0], F: [0, 0, 1], D: [0, -1, 0], L: [-1, 0, 0], B: [0, 0, -1] };
   const FACELETS = [];
   for (const f of FACE_LETTERS) {
@@ -176,20 +176,20 @@ const RC = (function () {
   }
   const sameVec = (a, b) => a[0] === b[0] && a[1] === b[1] && a[2] === b[2];
   const faceletIndex = (pos, n) => FACELETS.findIndex((f) => sameVec(f.pos, pos) && sameVec(f.n, n));
-  // Posición cúbica de una pieza a partir de su nombre ('URF' -> [1,1,1])
+  // Cubie coordinates from a piece name ('URF' -> [1,1,1])
   function pieceCoords(name) {
     const v = [0, 0, 0];
     for (const ch of name) { const n = NORMALS[ch]; v[0] += n[0]; v[1] += n[1]; v[2] += n[2]; }
     return v;
   }
-  // Para cada pieza, los índices de sus pegatinas en el orden de su nombre
+  // For each piece, the indices of its stickers in the order of its name
   const CORNER_FACELETS = CORNER_NAMES.map((nm) => [...nm].map((ch) => faceletIndex(pieceCoords(nm), NORMALS[ch])));
   const EDGE_FACELETS = EDGE_NAMES.map((nm) => [...nm].map((ch) => faceletIndex(pieceCoords(nm), NORMALS[ch])));
 
-  // Estado -> 54 letras de color (cada letra = cara de la que proviene la pegatina)
+  // State -> 54 color letters (each letter = the face the sticker comes from)
   function toFacelets(cube) {
     const fl = new Array(54);
-    for (let f = 0; f < 6; f++) fl[f * 9 + 4] = FACE_LETTERS[f]; // los centros no se mueven
+    for (let f = 0; f < 6; f++) fl[f * 9 + 4] = FACE_LETTERS[f]; // centers never move
     for (let i = 0; i < 8; i++) {
       const j = cube.cp[i], o = cube.co[i];
       for (let n = 0; n < 3; n++) fl[CORNER_FACELETS[i][(n + o) % 3]] = CORNER_NAMES[j][n];
@@ -201,7 +201,7 @@ const RC = (function () {
     return fl;
   }
 
-  // Rotación de 90° de un vector entero alrededor del eje unitario a (cw = sentido horario mirando desde a)
+  // 90° rotation of an integer vector about the unit axis a (cw = clockwise when looking from a)
   function rotate90(v, a, cw) {
     const dot = a[0] * v[0] + a[1] * v[1] + a[2] * v[2];
     const cr = [a[1] * v[2] - a[2] * v[1], a[2] * v[0] - a[0] * v[2], a[0] * v[1] - a[1] * v[0]];

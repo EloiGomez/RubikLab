@@ -1,9 +1,9 @@
 <!doctype html>
-<html lang="es">
+<html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Laboratorio del grupo de Rubik</title>
+<title>Rubik Group Lab</title>
 <style>
   :root {
     --bg: #14161b; --panel: #1c1f27; --panel2: #232733; --line: #2d3240; --text: #e6e8ee; --muted: #8b92a5;
@@ -61,51 +61,51 @@
 </head>
 <body>
 <header>
-  <h1>Laboratorio del grupo de Rubik</h1>
-  <span>simulador · solver de dos fases · visualizador de estructura de grupo</span>
+  <h1>Rubik Group Lab</h1>
+  <span>simulator · two-phase solver · group-structure visualizer</span>
 </header>
 <main>
   <div class="col">
-    <section id="stage"><div class="hint">arrastra para girar la vista · teclas U R F D L B (Mayús = inverso)</div></section>
+    <section id="stage"><div class="hint">drag to rotate the view · keys U R F D L B (Shift = inverse)</div></section>
 
     <section>
-      <h2>Generadores (giros de cara)</h2>
+      <h2>Generators (face turns)</h2>
       <div class="moves" id="moveButtons"></div>
       <div class="row">
-        <button id="btnScramble">Mezclar (25)</button>
-        <button id="btnRandom">Estado aleatorio uniforme</button>
-        <button id="btnReset">Resolver (reset)</button>
-        <label><input type="checkbox" id="chkHighlight"> resaltar piezas fuera de lugar</label>
+        <button id="btnScramble">Scramble (25)</button>
+        <button id="btnRandom">Uniform random state</button>
+        <button id="btnReset">Reset (solved)</button>
+        <label><input type="checkbox" id="chkHighlight"> highlight misplaced pieces</label>
       </div>
-      <div class="row"><label style="flex:1">velocidad <input type="range" id="speed" min="0" max="100" value="70"></label></div>
+      <div class="row"><label style="flex:1">speed <input type="range" id="speed" min="0" max="100" value="70"></label></div>
     </section>
 
     <section>
-      <h2>Solver (Kociemba, dos fases)</h2>
+      <h2>Solver (Kociemba, two phases)</h2>
       <div class="row">
-        <button class="primary" id="btnSolve">Calcular solución</button>
-        <button id="btnPlay" disabled>Reproducir todo</button>
-        <button id="btnStep" disabled>Paso ▸</button>
+        <button class="primary" id="btnSolve">Compute solution</button>
+        <button id="btnPlay" disabled>Play all</button>
+        <button id="btnStep" disabled>Step ▸</button>
       </div>
       <div class="chips" id="solution" style="margin-top:10px"></div>
       <div class="msg" id="solveMsg"></div>
       <details>
-        <summary>¿Cómo funciona?</summary>
-        <p>El solver usa la cadena de subgrupos <code>G ⊃ H = ⟨U, D, R2, L2, F2, B2⟩</code>. La <b style="color:var(--accent)">fase 1</b> lleva el cubo a <code>H</code> (torsión de esquinas, orientación de aristas y aristas de la capa central en su sitio: las tres coordenadas del espacio cociente <code>G/H</code>, 2187 × 2048 × 495 cosets). La <b style="color:var(--accent2)">fase 2</b> resuelve dentro de <code>H</code>, que solo tiene 19 508 428 800 elementos. Ambas fases usan IDA* con tablas de poda construidas por BFS sobre las coordenadas.</p>
+        <summary>How does it work?</summary>
+        <p>The solver uses the subgroup chain <code>G ⊃ H = ⟨U, D, R2, L2, F2, B2⟩</code>. <b style="color:var(--accent)">Phase 1</b> brings the cube into <code>H</code> (corner twist, edge flip and middle-slice edges in their slice: the three coordinates of the quotient space <code>G/H</code>, 2187 × 2048 × 495 cosets). <b style="color:var(--accent2)">Phase 2</b> solves inside <code>H</code>, which has only 19,508,428,800 elements. Both phases use IDA* with pruning tables built by BFS over the coordinates.</p>
       </details>
     </section>
   </div>
 
   <div class="col">
     <section>
-      <h2>Estado como elemento del grupo</h2>
+      <h2>State as a group element</h2>
       <dl class="kv" id="summary"></dl>
       <details open>
-        <summary>Descomposición en ciclos</summary>
+        <summary>Cycle decomposition</summary>
         <div id="cycles" style="margin-top:8px"></div>
       </details>
       <details>
-        <summary>Tabla de piezas (cp, co, ep, eo)</summary>
+        <summary>Piece table (cp, co, ep, eo)</summary>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:8px">
           <table class="pieces" id="tblCorners"></table>
           <table class="pieces" id="tblEdges"></table>
@@ -114,42 +114,42 @@
     </section>
 
     <section>
-      <h2>Cadena de subgrupos</h2>
+      <h2>Subgroup chain</h2>
       <div class="chain" id="chain"></div>
       <div class="msg" id="chainMsg"></div>
     </section>
 
     <section>
-      <h2>Explorador de algoritmos</h2>
+      <h2>Algorithm explorer</h2>
       <div class="row">
-        <input type="text" id="algA" value="R U R' U'" spellcheck="false" placeholder="Algoritmo A, ej. R U R' U'">
-        <button id="btnApplyA">Aplicar</button>
+        <input type="text" id="algA" value="R U R' U'" spellcheck="false" placeholder="Algorithm A, e.g. R U R' U'">
+        <button id="btnApplyA">Apply</button>
       </div>
       <div class="row">
-        <input type="text" id="algB" value="F" spellcheck="false" placeholder="Algoritmo B">
+        <input type="text" id="algB" value="F" spellcheck="false" placeholder="Algorithm B">
         <button id="btnComm">[A, B]</button>
         <button id="btnConj">B A B⁻¹</button>
         <button id="btnInv">A⁻¹</button>
       </div>
-      <div class="row"><button id="btnOrder">Analizar A como elemento <span class="mono">g</span></button></div>
+      <div class="row"><button id="btnOrder">Analyze A as a group element <span class="mono">g</span></button></div>
       <div id="orderOut" style="margin-top:10px"></div>
       <div class="row" id="powerRow" style="display:none">
-        <label style="flex:1">potencia <span class="mono" id="powLabel">g^0</span>
+        <label style="flex:1">power <span class="mono" id="powLabel">g^0</span>
           <input type="range" id="powSlider" min="0" max="0" value="0"></label>
       </div>
     </section>
 
     <section>
-      <h2>Teoría en 1 minuto</h2>
-      <details open><summary>Qué es cada cosa</summary>
+      <h2>Theory in one minute</h2>
+      <details open><summary>What is what</summary>
         <ul>
-          <li><b>Acciones</b>: cada giro es una permutación de 8 esquinas y 12 aristas más cambios de orientación. Un estado <i>es</i> la acción que lo produce desde el cubo resuelto.</li>
-          <li><b>Producto</b>: <code>A·B</code> = hacer A y luego B. Es asociativo, tiene identidad (no hacer nada) e inversos (<code>R⁻¹ = R'</code>), pero <b>no es conmutativo</b>.</li>
-          <li><b>Orden</b> de un elemento: veces que hay que repetirlo para volver al inicio. Un ciclo de longitud L y torsión nula aporta L; con torsión ≠ 0 aporta 3L (esquinas) o 2L (aristas). El orden es el mcm de todo. <code>R U</code> tiene orden 105.</li>
+          <li><b>Actions</b>: each turn is a permutation of 8 corners and 12 edges plus orientation changes. A state <i>is</i> the action that produces it from the solved cube.</li>
+          <li><b>Product</b>: <code>A·B</code> = do A, then B. It is associative, has an identity (do nothing) and inverses (<code>R⁻¹ = R'</code>), but it is <b>not commutative</b>.</li>
+          <li><b>Order</b> of an element: how many times it must be repeated to get back to the start. A cycle of length L with zero twist contributes L; with non-zero twist it contributes 3L (corners) or 2L (edges). The order is the lcm of everything. <code>R U</code> has order 105.</li>
         </ul>
       </details>
-      <details><summary>Por qué |G| = 43 252 003 274 489 856 000</summary>
-        <p><code>G ≅ (Z₃⁷ × Z₂¹¹) ⋊ ((A₈ × A₁₂) ⋊ Z₂)</code>. Se parte del espacio libre de <code>8!·3⁸·12!·2¹²</code> configuraciones y se imponen tres restricciones independientes: suma de torsiones de esquinas ≡ 0 (mod 3) → ÷3, suma de volteos de aristas ≡ 0 (mod 2) → ÷2, y paridad de la permutación de esquinas = paridad de la de aristas → ÷2. Total: <code>8!·12!·3⁷·2¹¹ / 2</code>. Estas restricciones son <i>invariantes</i>: ningún giro legal las rompe (míralas en el panel de estado).</p>
+      <details><summary>Why |G| = 43,252,003,274,489,856,000</summary>
+        <p><code>G ≅ (Z₃⁷ × Z₂¹¹) ⋊ ((A₈ × A₁₂) ⋊ Z₂)</code>. Start from the free space of <code>8!·3⁸·12!·2¹²</code> configurations and impose three independent constraints: the corner twists sum to 0 (mod 3) → ÷3, the edge flips sum to 0 (mod 2) → ÷2, and the corner permutation parity equals the edge permutation parity → ÷2. Total: <code>8!·12!·3⁷·2¹¹ / 2</code>. These constraints are <i>invariants</i>: no legal turn can break them (check them in the state panel).</p>
       </details>
     </section>
   </div>

@@ -1,8 +1,8 @@
-/* Solver de dos fases (Kociemba) basado en la cadena de subgrupos G0 ⊃ H = <U,D,R2,L2,F2,B2>.
+/* Two-phase solver (Kociemba) based on the subgroup chain G0 ⊃ H = <U,D,R2,L2,F2,B2>.
  *
- * Fase 1: llevar el cubo a H, es decir, twist = flip = slice = 0 (coordenadas del espacio cociente G0/H).
- * Fase 2: resolver dentro de H con los 10 movimientos que lo generan.
- * Cada coordenada tiene tabla de movimientos y las búsquedas IDA* usan tablas de poda (BFS).
+ * Phase 1: bring the cube into H, i.e. twist = flip = slice = 0 (coordinates of the quotient space G0/H).
+ * Phase 2: solve inside H using the 10 moves that generate it.
+ * Every coordinate has a move table and the IDA* searches use pruning tables built by BFS.
  */
 const RCSolver = (function (RC) {
   const { Cube, MOVES } = RC;
@@ -12,7 +12,7 @@ const RCSolver = (function (RC) {
   for (let n = 0; n < 13; n++) { CNK[n][0] = 1; for (let k = 1; k <= n; k++) CNK[n][k] = CNK[n - 1][k - 1] + (k <= n - 1 ? CNK[n - 1][k] : 0); }
   const FACT = [1, 1, 2, 6, 24, 120, 720, 5040, 40320];
 
-  // ---- coordenadas ----
+  // ---- coordinates ----
   const twistOf = (co) => { let t = 0; for (let i = 0; i < 7; i++) t = t * 3 + co[i]; return t; };
   function setTwist(co, t) {
     let s = 0;
@@ -25,7 +25,7 @@ const RCSolver = (function (RC) {
     for (let i = 10; i >= 0; i--) { eo[i] = f & 1; s += eo[i]; f >>= 1; }
     eo[11] = s % 2;
   }
-  // slice: qué 4 posiciones ocupan las aristas FR FL BL BR (número combinatorio, resuelto = 494)
+  // slice: which 4 positions hold the edges FR FL BL BR (combinatorial rank, solved = 494)
   function sliceOf(ep) {
     let a = 0, x = 0;
     for (let j = 0; j < 12; j++) if (ep[j] >= 8) { x++; a += CNK[j][x]; }
@@ -38,7 +38,7 @@ const RCSolver = (function (RC) {
     let a = 0, b = 8;
     for (let j = 0; j < 12; j++) ep[j] = isSlice[j] ? b++ : a++;
   }
-  // rango de Lehmer de los n primeros elementos de una permutación con valores 0..n-1 (tras restar base)
+  // Lehmer rank of the first n entries of a permutation with values 0..n-1
   function permRank(arr, off, n, base) {
     let r = 0;
     for (let i = 0; i < n; i++) {
@@ -60,19 +60,18 @@ const RCSolver = (function (RC) {
   const coordsPhase1 = (c) => [twistOf(c.co), flipOf(c.eo), sliceOf(c.ep)];
   const SOLVED_SLICE = sliceOf([0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]);
 
-  // ---- tablas (se construyen una vez) ----
+  // ---- tables (built once) ----
   let T = null;
   function build() {
     if (T) return T;
     const t0 = Date.now();
     const nm1 = 18, nm2 = P2_MOVES.length;
     const twistMove = new Int16Array(2187 * nm1), flipMove = new Int16Array(2048 * nm1), sliceMove = new Int16Array(495 * nm1);
-    const tmp = new Cube();
     for (let t = 0; t < 2187; t++) { const c = new Cube(); setTwist(c.co, t); for (let m = 0; m < nm1; m++) twistMove[t * nm1 + m] = twistOf(c.multiply(MOVES[m]).co); }
     for (let f = 0; f < 2048; f++) { const c = new Cube(); setFlip(c.eo, f); for (let m = 0; m < nm1; m++) flipMove[f * nm1 + m] = flipOf(c.multiply(MOVES[m]).eo); }
     for (let s = 0; s < 495; s++) { const c = new Cube(); setSlice(c.ep, s); for (let m = 0; m < nm1; m++) sliceMove[s * nm1 + m] = sliceOf(c.multiply(MOVES[m]).ep); }
 
-    // fase 2: permutaciones directas sobre arrays para ir rápido
+    // phase 2: permute plain arrays directly for speed
     const cpMove = new Int32Array(40320 * nm2), epMove = new Int32Array(40320 * nm2), spMove = new Int16Array(24 * nm2);
     for (let r = 0; r < 40320; r++) {
       const p = permUnrank(r, 8);
@@ -87,7 +86,7 @@ const RCSolver = (function (RC) {
       for (let k = 0; k < nm2; k++) { const mv = MOVES[P2_MOVES[k]]; spMove[r * nm2 + k] = spRank(mv.ep.map((x) => ep[x])); }
     }
 
-    // tablas de poda por BFS sobre el producto de dos coordenadas
+    // pruning tables: BFS over the product of two coordinates
     const bfs = (nA, nB, moveA, moveB, nm, startA, startB) => {
       const d = new Uint8Array(nA * nB).fill(255);
       d[startA * nB + startB] = 0;
@@ -110,13 +109,12 @@ const RCSolver = (function (RC) {
     const pruneCP = bfs(40320, 24, cpMove, spMove, nm2, 0, 0);
     const pruneEP = bfs(40320, 24, epMove, spMove, nm2, 0, 0);
     T = { nm1, nm2, twistMove, flipMove, sliceMove, cpMove, epMove, spMove, pruneTS, pruneFS, pruneCP, pruneEP, ms: Date.now() - t0 };
-    void tmp;
     return T;
   }
 
   const skip = (face, last) => face === last || (last >= 0 && face % 3 === last % 3 && face < last);
 
-  /** Resuelve `cube`. Devuelve {moves, phase1Length, ms}. Sigue buscando mejoras hasta timeMs. */
+  /** Solves `cube`. Returns {moves, phase1Length, ms}. Keeps searching for shorter solutions until timeMs. */
   function solve(cube, { maxLength = 30, timeMs = 1500 } = {}) {
     const tb = build();
     const t0 = Date.now();
@@ -165,7 +163,6 @@ const RCSolver = (function (RC) {
         dfs1(tb.twistMove[t * 18 + m], tb.flipMove[f * 18 + m], tb.sliceMove[s * 18 + m], depth - 1, face);
         path.pop();
         if (timedOut) return;
-        if (best && best.length <= path.length + depth) { /* seguir: otras ramas pueden mejorar */ }
       }
     };
 
