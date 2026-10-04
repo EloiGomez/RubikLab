@@ -258,7 +258,63 @@
       ? 'This element is in G₀ but not in G₁. Phase 1 of the solver would bring it into G₂ = H.'
       : cur === 4 ? 'This is the identity: it belongs to every subgroup.'
       : `The smallest subgroup in the chain containing it is G${'₀₁₂₃₄'[cur]}.`;
+    drawNet();
   }
+
+  // =========================================================== sticker rings of algorithm A
+  // The six faces (9 dots each) sit on a hexagon; every ring is a closed curve through the stickers of one cycle.
+  const HEX_ORDER = ['R', 'F', 'U', 'L', 'B', 'D'], HEX_R = 3.5, DOT_GAP = 0.5;
+  const faceCenter = (f) => {
+    const a = ((HEX_ORDER.indexOf(f) * 60 - 90) * Math.PI) / 180;
+    return [HEX_R * Math.cos(a), HEX_R * Math.sin(a)];
+  };
+  const netPos = (i) => {
+    const [cx, cy] = faceCenter(FACE_LETTERS[(i / 9) | 0]), k = i % 9;
+    return [cx + ((k % 3) - 1) * DOT_GAP, cy + (((k / 3) | 0) - 1) * DOT_GAP];
+  };
+  // closed Catmull-Rom spline through the points, as cubic Bézier segments; also returns each segment's midpoint and tangent angle
+  function smoothRing(pts) {
+    const n = pts.length, k = 0.2, segs = [];
+    let d = `M${pts[0][0]} ${pts[0][1]}`;
+    for (let i = 0; i < n; i++) {
+      const p0 = pts[(i + n - 1) % n], p1 = pts[i], p2 = pts[(i + 1) % n], p3 = pts[(i + 2) % n];
+      const c1 = [p1[0] + (p2[0] - p0[0]) * k, p1[1] + (p2[1] - p0[1]) * k], c2 = [p2[0] - (p3[0] - p1[0]) * k, p2[1] - (p3[1] - p1[1]) * k];
+      d += ` C${c1[0]} ${c1[1]} ${c2[0]} ${c2[1]} ${p2[0]} ${p2[1]}`;
+      const mx = (p1[0] + 3 * c1[0] + 3 * c2[0] + p2[0]) / 8, my = (p1[1] + 3 * c1[1] + 3 * c2[1] + p2[1]) / 8;
+      const tx = p2[0] + c2[0] - c1[0] - p1[0], ty = p2[1] + c2[1] - c1[1] - p1[1];
+      segs.push([mx, my, (Math.atan2(ty, tx) * 180) / Math.PI]);
+    }
+    return { d, segs };
+  }
+  const CSS_COLORS = Object.fromEntries(Object.entries(COLORS).map(([k, v]) => [k, '#' + v.toString(16).padStart(6, '0')]));
+  function drawNet() {
+    let g = null;
+    try { g = RC.applyAlg(new Cube(), RC.parseAlg($('algA').value)); } catch (e) { /* invalid text: keep last drawing */ return; }
+    const cycles = RC.stickerCycles(g), moving = new Set(cycles.flat());
+    const fl = RC.toFacelets(state), svg = [];
+    cycles.forEach((cyc, ci) => {
+      const col = `hsl(${Math.round((360 * ci) / cycles.length)} 90% 62%)`;
+      const ring = smoothRing(cyc.map(netPos));
+      svg.push(`<path d="${ring.d}" fill="none" stroke="${col}" stroke-width="0.05" opacity="0.9"/>`);
+      ring.segs.forEach(([x, y, a]) => svg.push(`<polygon points="0.13,0 -0.08,0.08 -0.08,-0.08" fill="${col}" transform="translate(${x} ${y}) rotate(${a})"/>`));
+    });
+    const dots = FACELETS.map((_, i) => {
+      const [x, y] = netPos(i);
+      return `<circle cx="${x}" cy="${y}" r="0.2" fill="${CSS_COLORS[fl[i]]}" stroke="#0b0b0d" stroke-width="0.03" opacity="${!cycles.length || moving.has(i) ? 1 : 0.35}"/>`;
+    });
+    const labels = HEX_ORDER.map((f) => {
+      const [cx, cy] = faceCenter(f), s = 1 + 1.15 / HEX_R;
+      return `<text x="${cx * s}" y="${cy * s}" fill="#e6e8ee" font-size="0.5" font-weight="700" text-anchor="middle" dominant-baseline="middle">${f}</text>`;
+    });
+    $('net').innerHTML = svg.join('') + dots.join('') + labels.join('');
+    const o = RC.order(g), lens = {};
+    cycles.forEach((c) => (lens[c.length] = (lens[c.length] || 0) + 1));
+    const desc = Object.keys(lens).map((l) => `${lens[l]} ring${lens[l] > 1 ? 's' : ''} of ${l}`).join(' + ');
+    $('netMsg').textContent = cycles.length
+      ? `${desc} (${54 - moving.size} stickers stay put). Each sticker travels along its ring; repeat A ${o} times and every sticker is back home.`
+      : 'A is the identity: no sticker moves.';
+  }
+  $('algA').addEventListener('input', drawNet);
 
   // =========================================================== algorithm explorer
   let powers = [];

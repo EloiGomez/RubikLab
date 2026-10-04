@@ -201,6 +201,34 @@ const RC = (function () {
     return fl;
   }
 
+  // Sticker permutation of a state: src[g] = index of the facelet where the sticker now at g started
+  function stickerSource(cube) {
+    const src = new Array(54);
+    for (let f = 0; f < 6; f++) src[f * 9 + 4] = f * 9 + 4;
+    for (let i = 0; i < 8; i++) {
+      const j = cube.cp[i], o = cube.co[i];
+      for (let n = 0; n < 3; n++) src[CORNER_FACELETS[i][(n + o) % 3]] = CORNER_FACELETS[j][n];
+    }
+    for (let i = 0; i < 12; i++) {
+      const j = cube.ep[i], o = cube.eo[i];
+      for (let n = 0; n < 2; n++) src[EDGE_FACELETS[i][(n + o) % 2]] = EDGE_FACELETS[j][n];
+    }
+    return src;
+  }
+  // Cycles of the sticker movement (each sticker travels from src[g] to g); fixed stickers are omitted
+  function stickerCycles(cube) {
+    const src = stickerSource(cube), dest = new Array(54);
+    src.forEach((s, g) => (dest[s] = g));
+    const seen = new Array(54).fill(false), res = [];
+    for (let s = 0; s < 54; s++) {
+      if (seen[s] || dest[s] === s) { seen[s] = true; continue; }
+      const cyc = []; let x = s;
+      while (!seen[x]) { seen[x] = true; cyc.push(x); x = dest[x]; }
+      res.push(cyc);
+    }
+    return res;
+  }
+
   // 90° rotation of an integer vector about the unit axis a (cw = clockwise when looking from a)
   function rotate90(v, a, cw) {
     const dot = a[0] * v[0] + a[1] * v[1] + a[2] * v[2];
@@ -212,7 +240,7 @@ const RC = (function () {
   return {
     Cube, MOVES, MOVE_NAMES, CORNER_NAMES, EDGE_NAMES, FACE_LETTERS, NORMALS, FACELETS,
     CORNER_FACELETS, EDGE_FACELETS, moveName, parseAlg, algToString, invertAlg, applyAlg, simplifyAlg,
-    cycles, order, permParity, randomState, randomScramble, toFacelets, rotate90, faceletIndex, lcm,
+    cycles, order, permParity, randomState, randomScramble, toFacelets, stickerSource, stickerCycles, rotate90, faceletIndex, lcm,
   };
 })();
 if (typeof module !== 'undefined') module.exports = RC;

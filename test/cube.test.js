@@ -48,6 +48,18 @@ for (let t = 0; t < 200; t++) {
 }
 console.log('ok invariants + order formula == brute force');
 
+// 3b. Sticker permutation agrees with the color model; a face turn = five 4-cycles of stickers
+for (let t = 0; t < 100; t++) {
+  const c = R.applyAlg(new Cube(), R.randomScramble(30)), src = R.stickerSource(c), fl = R.toFacelets(c);
+  src.forEach((s, g) => assert.strictEqual(FACELETS[s].face, fl[g], 'sticker source'));
+}
+for (let f = 0; f < 6; f++) {
+  const cyc = R.stickerCycles(MOVES[f * 3]);
+  assert.strictEqual(cyc.length, 5, 'five rings per face turn');
+  assert(cyc.every((x) => x.length === 4), 'rings of 4');
+}
+console.log('ok sticker cycles');
+
 // 4. Algorithm algebra
 const alg = R.parseAlg("R U R' U'");
 assert(R.applyAlg(R.applyAlg(new Cube(), alg), R.invertAlg(alg)).isSolved());
