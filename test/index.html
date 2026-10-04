@@ -1,0 +1,15 @@
+<!doctype html><meta charset="utf-8"><title>tests</title>
+<pre id="out" style="font:14px monospace"></pre>
+<script>
+const out = document.getElementById('out');
+const log = (...a) => { out.textContent += a.join(' ') + '\n'; };
+console.log = log;
+window.assert = Object.assign((c, m) => { if (!c) throw new Error('assert: ' + (m || '')); }, {
+  strictEqual: (a, b, m) => { if (a !== b) throw new Error((m || 'strictEqual') + ': ' + a + ' !== ' + b); },
+  deepStrictEqual: (a, b, m) => { if (JSON.stringify(a) !== JSON.stringify(b)) throw new Error((m || 'deepEqual') + '\n' + JSON.stringify(a) + '\n' + JSON.stringify(b)); },
+});
+window.onerror = (m) => { log('FALLO:', m); };
+</script>
+<script src="../js/cube.js"></script>
+<script src="../js/solver.js"></script>
+<script>try { document.write('<script src="cube.test.js"><\/script><script src="solver.test.js"><\/script><script>log("FIN")<\/script>'); } catch (e) { log(e); }</script>

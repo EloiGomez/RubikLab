@@ -1,0 +1,163 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Laboratorio del grupo de Rubik</title>
+<style>
+  :root {
+    --bg: #14161b; --panel: #1c1f27; --panel2: #232733; --line: #2d3240; --text: #e6e8ee; --muted: #8b92a5;
+    --accent: #5b8cff; --accent2: #ffb454; --ok: #4cc38a; --bad: #ff6b6b;
+    --mono: ui-monospace, "Cascadia Code", Consolas, monospace;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text); font: 14px/1.45 system-ui, "Segoe UI", sans-serif; }
+  header { padding: 14px 20px; border-bottom: 1px solid var(--line); display: flex; align-items: baseline; gap: 14px; flex-wrap: wrap; }
+  header h1 { font-size: 18px; margin: 0; }
+  header span { color: var(--muted); }
+  main { display: grid; grid-template-columns: minmax(340px, 1fr) minmax(360px, 520px); gap: 16px; padding: 16px; max-width: 1500px; margin: 0 auto; }
+  @media (max-width: 900px) { main { grid-template-columns: 1fr; } }
+  .col { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+  section { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 14px; }
+  section h2 { margin: 0 0 10px; font-size: 13px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); font-weight: 600; }
+  #stage { position: relative; height: min(62vh, 520px); min-height: 320px; padding: 0; overflow: hidden; cursor: grab; touch-action: none; }
+  #stage canvas { display: block; width: 100%; height: 100%; }
+  #stage .hint { position: absolute; left: 12px; bottom: 8px; color: var(--muted); font-size: 12px; pointer-events: none; }
+  .moves { display: grid; grid-template-columns: repeat(6, 1fr); gap: 6px; }
+  .moves button { padding: 7px 0; }
+  button { background: var(--panel2); color: var(--text); border: 1px solid var(--line); border-radius: 6px; padding: 7px 12px; cursor: pointer; font: inherit; }
+  button:hover { border-color: var(--accent); }
+  button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+  button:disabled { opacity: .5; cursor: default; }
+  .row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-top: 10px; }
+  .row:first-child { margin-top: 0; }
+  input[type=text] { flex: 1; min-width: 120px; background: var(--bg); color: var(--text); border: 1px solid var(--line); border-radius: 6px; padding: 7px 10px; font: 13px var(--mono); }
+  input[type=range] { flex: 1; accent-color: var(--accent); }
+  label { color: var(--muted); font-size: 12px; display: flex; align-items: center; gap: 6px; }
+  .mono { font-family: var(--mono); }
+  .chips { display: flex; flex-wrap: wrap; gap: 4px; }
+  .chip { font: 12px var(--mono); background: var(--panel2); border: 1px solid var(--line); border-radius: 5px; padding: 2px 6px; }
+  .chip.p1 { border-color: var(--accent); } .chip.p2 { border-color: var(--accent2); } .chip.done { opacity: .35; }
+  .chip.tw { color: var(--accent2); }
+  .kv { display: grid; grid-template-columns: auto 1fr; gap: 4px 12px; }
+  .kv dt { color: var(--muted); } .kv dd { margin: 0; }
+  table.pieces { border-collapse: collapse; width: 100%; font: 12px var(--mono); }
+  table.pieces td, table.pieces th { padding: 2px 6px; text-align: left; border-bottom: 1px solid var(--line); }
+  table.pieces th { color: var(--muted); font-weight: 500; }
+  .moved { color: var(--accent2); }
+  .chain { display: flex; flex-direction: column; gap: 6px; }
+  .level { display: grid; grid-template-columns: 22px 1fr auto; gap: 8px; align-items: baseline; padding: 6px 8px; border-radius: 6px; border: 1px solid var(--line); }
+  .level.in { border-color: var(--ok); } .level.cur { background: rgba(76,195,138,.12); }
+  .level .mk { color: var(--ok); font-weight: 700; } .level.out .mk { color: var(--bad); }
+  .level small { color: var(--muted); display: block; }
+  .tag { font-size: 11px; padding: 1px 6px; border-radius: 10px; background: var(--panel2); color: var(--muted); }
+  .tag.ok { background: rgba(76,195,138,.18); color: var(--ok); } .tag.bad { background: rgba(255,107,107,.18); color: var(--bad); }
+  details { margin-top: 4px; } summary { cursor: pointer; color: var(--accent); }
+  details p, details li { color: #c5c9d6; }
+  code { font-family: var(--mono); background: var(--panel2); padding: 0 4px; border-radius: 3px; }
+  .msg { color: var(--muted); font-size: 12px; margin-top: 8px; min-height: 16px; }
+  .err { color: var(--bad); }
+</style>
+</head>
+<body>
+<header>
+  <h1>Laboratorio del grupo de Rubik</h1>
+  <span>simulador · solver de dos fases · visualizador de estructura de grupo</span>
+</header>
+<main>
+  <div class="col">
+    <section id="stage"><div class="hint">arrastra para girar la vista · teclas U R F D L B (Mayús = inverso)</div></section>
+
+    <section>
+      <h2>Generadores (giros de cara)</h2>
+      <div class="moves" id="moveButtons"></div>
+      <div class="row">
+        <button id="btnScramble">Mezclar (25)</button>
+        <button id="btnRandom">Estado aleatorio uniforme</button>
+        <button id="btnReset">Resolver (reset)</button>
+        <label><input type="checkbox" id="chkHighlight"> resaltar piezas fuera de lugar</label>
+      </div>
+      <div class="row"><label style="flex:1">velocidad <input type="range" id="speed" min="0" max="100" value="70"></label></div>
+    </section>
+
+    <section>
+      <h2>Solver (Kociemba, dos fases)</h2>
+      <div class="row">
+        <button class="primary" id="btnSolve">Calcular solución</button>
+        <button id="btnPlay" disabled>Reproducir todo</button>
+        <button id="btnStep" disabled>Paso ▸</button>
+      </div>
+      <div class="chips" id="solution" style="margin-top:10px"></div>
+      <div class="msg" id="solveMsg"></div>
+      <details>
+        <summary>¿Cómo funciona?</summary>
+        <p>El solver usa la cadena de subgrupos <code>G ⊃ H = ⟨U, D, R2, L2, F2, B2⟩</code>. La <b style="color:var(--accent)">fase 1</b> lleva el cubo a <code>H</code> (torsión de esquinas, orientación de aristas y aristas de la capa central en su sitio: las tres coordenadas del espacio cociente <code>G/H</code>, 2187 × 2048 × 495 cosets). La <b style="color:var(--accent2)">fase 2</b> resuelve dentro de <code>H</code>, que solo tiene 19 508 428 800 elementos. Ambas fases usan IDA* con tablas de poda construidas por BFS sobre las coordenadas.</p>
+      </details>
+    </section>
+  </div>
+
+  <div class="col">
+    <section>
+      <h2>Estado como elemento del grupo</h2>
+      <dl class="kv" id="summary"></dl>
+      <details open>
+        <summary>Descomposición en ciclos</summary>
+        <div id="cycles" style="margin-top:8px"></div>
+      </details>
+      <details>
+        <summary>Tabla de piezas (cp, co, ep, eo)</summary>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:8px">
+          <table class="pieces" id="tblCorners"></table>
+          <table class="pieces" id="tblEdges"></table>
+        </div>
+      </details>
+    </section>
+
+    <section>
+      <h2>Cadena de subgrupos</h2>
+      <div class="chain" id="chain"></div>
+      <div class="msg" id="chainMsg"></div>
+    </section>
+
+    <section>
+      <h2>Explorador de algoritmos</h2>
+      <div class="row">
+        <input type="text" id="algA" value="R U R' U'" spellcheck="false" placeholder="Algoritmo A, ej. R U R' U'">
+        <button id="btnApplyA">Aplicar</button>
+      </div>
+      <div class="row">
+        <input type="text" id="algB" value="F" spellcheck="false" placeholder="Algoritmo B">
+        <button id="btnComm">[A, B]</button>
+        <button id="btnConj">B A B⁻¹</button>
+        <button id="btnInv">A⁻¹</button>
+      </div>
+      <div class="row"><button id="btnOrder">Analizar A como elemento <span class="mono">g</span></button></div>
+      <div id="orderOut" style="margin-top:10px"></div>
+      <div class="row" id="powerRow" style="display:none">
+        <label style="flex:1">potencia <span class="mono" id="powLabel">g^0</span>
+          <input type="range" id="powSlider" min="0" max="0" value="0"></label>
+      </div>
+    </section>
+
+    <section>
+      <h2>Teoría en 1 minuto</h2>
+      <details open><summary>Qué es cada cosa</summary>
+        <ul>
+          <li><b>Acciones</b>: cada giro es una permutación de 8 esquinas y 12 aristas más cambios de orientación. Un estado <i>es</i> la acción que lo produce desde el cubo resuelto.</li>
+          <li><b>Producto</b>: <code>A·B</code> = hacer A y luego B. Es asociativo, tiene identidad (no hacer nada) e inversos (<code>R⁻¹ = R'</code>), pero <b>no es conmutativo</b>.</li>
+          <li><b>Orden</b> de un elemento: veces que hay que repetirlo para volver al inicio. Un ciclo de longitud L y torsión nula aporta L; con torsión ≠ 0 aporta 3L (esquinas) o 2L (aristas). El orden es el mcm de todo. <code>R U</code> tiene orden 105.</li>
+        </ul>
+      </details>
+      <details><summary>Por qué |G| = 43 252 003 274 489 856 000</summary>
+        <p><code>G ≅ (Z₃⁷ × Z₂¹¹) ⋊ ((A₈ × A₁₂) ⋊ Z₂)</code>. Se parte del espacio libre de <code>8!·3⁸·12!·2¹²</code> configuraciones y se imponen tres restricciones independientes: suma de torsiones de esquinas ≡ 0 (mod 3) → ÷3, suma de volteos de aristas ≡ 0 (mod 2) → ÷2, y paridad de la permutación de esquinas = paridad de la de aristas → ÷2. Total: <code>8!·12!·3⁷·2¹¹ / 2</code>. Estas restricciones son <i>invariantes</i>: ningún giro legal las rompe (míralas en el panel de estado).</p>
+      </details>
+    </section>
+  </div>
+</main>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="js/cube.js"></script>
+<script src="js/solver.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>
