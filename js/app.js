@@ -61,6 +61,7 @@
       s.material.color.setHex(COLORS[fl[i]]);
       if (hl && ok[i]) s.material.color.lerp(new THREE.Color(0x2a2d36), 0.78);
     });
+    renderRings();
   }
 
   function resize() {
@@ -165,7 +166,7 @@
     busy = true;
     while (queue.length) {
       const it = queue.shift();
-      await animateMove(it.m, duration());
+      await Promise.all([animateMove(it.m, duration()), animateRings(it.m, duration())]);
       state = state.multiply(MOVES[it.m]);
       if (it.tag === 'user') history.push(it.m);
       updateColors();
@@ -318,102 +319,111 @@
       : `The smallest subgroup in the chain containing it is G${'₀₁₂₃₄'[cur]}.`;
   }
 
-  // =========================================================== sticker rings of algorithm A
-  // Six faces (9 dots each) sit on a hexagon. Every sticker cycle of A is a ring: stickers that stay on one face turn
-  // around that face's centre; stickers spread over several faces ride a big concentric circle. Dots keep the colour of
-  // the sticker they represent, so stepping A moves them along their rings and A^order brings them all home.
-  const HEX_ORDER = ['R', 'F', 'U', 'L', 'B', 'D'], HEX_R = 3.8, DOT_GAP = 0.6, DOT_R = 0.22;
-  const faceAngle = (f) => HEX_ORDER.indexOf(f) * 60 - 90;                  // degrees, SVG orientation (y down)
-  const faceCenter = (f) => { const a = (faceAngle(f) * Math.PI) / 180; return [HEX_R * Math.cos(a), HEX_R * Math.sin(a)]; };
-  const gridPos = (i) => {
-    const [cx, cy] = faceCenter(FACE_LETTERS[(i / 9) | 0]), k = i % 9;
-    return [cx + ((k % 3) - 1) * DOT_GAP, cy + (((k / 3) | 0) - 1) * DOT_GAP];
-  };
+  // =========================================================== the nine rings
+  // Three families of three concentric circles, one family per axis (x: R/L, y: U/D, z: F/B); the three circles of a
+  // family are the three layers around that axis. A face sits where two families cross: its 3x3 stickers are the nine
+  // crossings. Turning a face slides the 12 stickers of its layer along one circle and spins the face's own nine
+  // dots; four turns bring everything home (R^4 = e).
+  const RG = { d: 2.7, rho: 3.7, delta: 0.5, dotR: 0.18 };
+  const RG_CENTERS = [[0, -RG.d], [0.866 * RG.d, 0.5 * RG.d], [-0.866 * RG.d, 0.5 * RG.d]];   // families x, y, z
+  const RG_STROKE = ['#e5484d', '#d7d9e0', '#30a46c'];
   const CSS_COLORS = Object.fromEntries(Object.entries(COLORS).map(([k, v]) => [k, '#' + v.toString(16).padStart(6, '0')]));
+  const ringRadius = (layer) => RG.rho + layer * RG.delta;
   const normDeg = (d) => ((((d + 180) % 360) + 360) % 360) - 180;
-  const STEP_MS = 900;
+  const faceAxis = (f) => f.n.findIndex((v) => v !== 0);
 
-  let rings = [], ringOrder = 1, ringInfo = '';
-  const ringAnim = { k: 0, t: 0, mode: 'idle', last: 0 };      // mode: idle | step (finish current step) | play
-
-  function buildRings(g) {
-    const cycles = RC.stickerCycles(g), moving = new Set(cycles.flat());
-    const sides = [];                                           // cycles that ride a big circle
-    rings = cycles.map((cyc) => {
-      const faces = new Set(cyc.map((s) => (s / 9) | 0));
-      if (faces.size === 1) {                                   // all on one face: turn around its centre
-        const [cx, cy] = faceCenter(FACE_LETTERS[[...faces][0]]);
-        const nodes = cyc.map((s) => { const [x, y] = gridPos(s); return { ang: (Math.atan2(y - cy, x - cx) * 180) / Math.PI, rad: Math.hypot(x - cx, y - cy) }; });
-        if (nodes.every((n) => n.rad > 1e-6 && Math.abs(n.rad - nodes[0].rad) < 1e-6)) return { cyc, cx, cy, rad: nodes[0].rad, nodes };
-      }
-      const r = { cyc, cx: 0, cy: 0, rad: 0, nodes: cyc.map((s) => ({ ang: faceAngle(FACE_LETTERS[(s / 9) | 0]) + (((s % 9) % 3) - 1) * 5 })) };
-      sides.push(r);
-      return r;
-    });
-    const spacing = Math.min(0.62, 2.4 / Math.max(sides.length, 1));
-    sides.forEach((r, gi) => { r.rad = HEX_R + (gi - (sides.length - 1) / 2) * spacing; });
-    rings.forEach((r, ri) => { r.color = `hsl(${Math.round((360 * ri) / rings.length)} 90% 62%)`; });
-    ringOrder = RC.order(g);
-    const lens = {};
-    cycles.forEach((c) => (lens[c.length] = (lens[c.length] || 0) + 1));
-    const desc = Object.keys(lens).map((l) => `${lens[l]} ring${lens[l] > 1 ? 's' : ''} of ${l}`).join(' + ');
-    ringInfo = cycles.length
-      ? `${desc} (${54 - moving.size} stickers stay put). Step A and every sticker moves one place along its ring; after ${ringOrder} step${ringOrder > 1 ? 's' : ''} they are all back home.`
-      : 'A is the identity: no sticker moves.';
+  function circleIntersections(c1, r1, c2, r2) {
+    const dx = c2[0] - c1[0], dy = c2[1] - c1[1], dist = Math.hypot(dx, dy);
+    const a = (r1 * r1 - r2 * r2 + dist * dist) / (2 * dist), h = Math.sqrt(Math.max(0, r1 * r1 - a * a));
+    const bx = c1[0] + (a * dx) / dist, by = c1[1] + (a * dy) / dist;
+    return [[bx - (h * dy) / dist, by + (h * dx) / dist], [bx + (h * dy) / dist, by - (h * dx) / dist]];
   }
+  // Screen position of every sticker slot: the crossing of the two rings (layers) it belongs to, on its face's side
+  const SLOT_POS = FACELETS.map((f) => {
+    const g = faceAxis(f), s = f.n[g], [a, b] = [0, 1, 2].filter((k) => k !== g);
+    const pts = circleIntersections(RG_CENTERS[a], ringRadius(f.pos[a]), RG_CENTERS[b], ringRadius(f.pos[b]));
+    const first = g === 0 ? pts[0][1] < pts[1][1] : pts[0][0] > pts[1][0];   // R = upper crossing; F and U = right-hand one
+    return first === s > 0 ? pts[0] : pts[1];
+  });
+  const faceCentre = (fl) => SLOT_POS[FACE_LETTERS.indexOf(fl) * 9 + 4];
+  const diagramMid = [0, 1].map((k) => [...FACE_LETTERS].reduce((s, fl) => s + faceCentre(fl)[k], 0) / 6);
 
-  function renderRings() {
-    const ease = ringAnim.mode === 'idle' ? 0 : ringAnim.t * ringAnim.t * (3 - 2 * ringAnim.t);
-    const p = ringAnim.k + ease, a = Math.floor(p), f = p - a, out = [], dots = [];
-    rings.forEach((r) => {
-      out.push(`<circle cx="${r.cx}" cy="${r.cy}" r="${r.rad}" fill="none" stroke="${r.color}" stroke-width="0.04" opacity="0.7"/>`);
-      const L = r.cyc.length;
-      r.cyc.forEach((s, j) => {
-        const n0 = r.nodes[(j + a) % L], n1 = r.nodes[(j + a + 1) % L];
-        const ang = ((n0.ang + normDeg(n1.ang - n0.ang) * f) * Math.PI) / 180;
-        dots.push(`<circle cx="${r.cx + r.rad * Math.cos(ang)}" cy="${r.cy + r.rad * Math.sin(ang)}" r="${DOT_R}" fill="${CSS_COLORS[FACELETS[s].face]}" stroke="#0b0b0d" stroke-width="0.04"/>`);
-      });
+  // Position of the sticker that starts the move at slot `s0`, at progress u in [0, nTurns]
+  function movePath(m) {
+    const letter = FACE_LETTERS[(m / 3) | 0], k = m % 3, n = NORMALS[letter];
+    const g = n.findIndex((v) => v !== 0), layer = n[g];
+    const turns = k === 0 ? [true] : k === 1 ? [true, true] : [false];
+    const paths = [];
+    FACELETS.forEach((f, s0) => {
+      if (n[0] * f.pos[0] + n[1] * f.pos[1] + n[2] * f.pos[2] !== 1) return;
+      const slots = [s0]; let pos = f.pos, nn = f.n;
+      for (const cw of turns) { pos = RC.rotate90(pos, n, cw); nn = RC.rotate90(nn, n, cw); slots.push(RC.faceletIndex(pos, nn)); }
+      paths.push(slots);
     });
-    const centers = HEX_ORDER.map((fl) => {                     // centres never move
-      const [x, y] = faceCenter(fl), i = FACE_LETTERS.indexOf(fl) * 9 + 4;
-      return `<circle cx="${x}" cy="${y}" r="${DOT_R}" fill="${CSS_COLORS[FACELETS[i].face]}" stroke="#0b0b0d" stroke-width="0.04" opacity="0.55"/>`;
-    });
-    const labels = HEX_ORDER.map((fl) => {
-      const [x, y] = faceCenter(fl), s = 1 + 1.75 / HEX_R;
-      return `<text x="${x * s}" y="${y * s}" fill="#e6e8ee" font-size="0.55" font-weight="700" text-anchor="middle" dominant-baseline="middle">${fl}</text>`;
-    });
-    $('net').innerHTML = out.join('') + centers.join('') + dots.join('') + labels.join('');
-    $('netMsg').textContent = `A^${ringOrder > 1 ? ringAnim.k % ringOrder : 0} · ` + ringInfo;
-    $('btnRingPlay').textContent = ringAnim.mode === 'play' ? 'Pause' : 'Play ⟳';
-  }
-
-  function tickRings(now) {
-    if (ringAnim.mode === 'idle') return;
-    ringAnim.t += (now - ringAnim.last) / STEP_MS;
-    ringAnim.last = now;
-    if (ringAnim.t >= 1) {
-      ringAnim.k++; ringAnim.t = 0;
-      if (ringAnim.mode === 'step') ringAnim.mode = 'idle';
+    // angle (about the ring's centre) of each of the 4 faces that the ring crosses, using the layer's middle stickers
+    const centre = RG_CENTERS[g], R = ringRadius(layer), faceAngles = {};
+    for (const b of [0, 1, 2].filter((x) => x !== g)) for (const sb of [1, -1]) {
+      const pos = [0, 0, 0], nn = [0, 0, 0]; pos[g] = layer; pos[b] = sb; nn[b] = sb;
+      const idx = RC.faceletIndex(pos, nn), p = SLOT_POS[idx];
+      faceAngles[FACELETS[idx].face] = (Math.atan2(p[1] - centre[1], p[0] - centre[0]) * 180) / Math.PI;
     }
-    renderRings();
-    if (ringAnim.mode !== 'idle') requestAnimationFrame(tickRings);
+    return { n, g, layer, centre, R, paths, faceAngles, faceSlot: FACE_LETTERS.indexOf(letter) * 9 + 4 };
   }
-  function startRings(mode) {
-    const wasIdle = ringAnim.mode === 'idle';
-    ringAnim.mode = mode;
-    if (wasIdle) { ringAnim.last = performance.now(); requestAnimationFrame(tickRings); }
-    renderRings();
+  const MOVE_PATHS = MOVES.map((_, m) => movePath(m));
+
+  function slidePoint(mp, s, t, f) {
+    const from = SLOT_POS[s], to = SLOT_POS[t];
+    if (FACELETS[s].face === FACELETS[mp.faceSlot].face) {                       // the turning face itself: spin about its centre
+      const c = SLOT_POS[mp.faceSlot];
+      const a0 = Math.atan2(from[1] - c[1], from[0] - c[0]), a1 = Math.atan2(to[1] - c[1], to[0] - c[0]);
+      const r0 = Math.hypot(from[0] - c[0], from[1] - c[1]), r1 = Math.hypot(to[0] - c[0], to[1] - c[1]);
+      const a = a0 + (normDeg(((a1 - a0) * 180) / Math.PI) * Math.PI / 180) * f, r = r0 + (r1 - r0) * f;
+      return [c[0] + r * Math.cos(a), c[1] + r * Math.sin(a)];
+    }
+    // a layer sticker: ride the ring in the direction that does not pass over another face
+    const ang = (p) => (Math.atan2(p[1] - mp.centre[1], p[0] - mp.centre[0]) * 180) / Math.PI;
+    const a0 = ang(from), a1 = ang(to), ccw = (((a1 - a0) % 360) + 360) % 360;
+    const f0 = FACELETS[s].face, f1 = FACELETS[t].face;
+    const blocked = Object.entries(mp.faceAngles).some(([fl, fa]) => fl !== f0 && fl !== f1 && ((((fa - a0) % 360) + 360) % 360) < ccw);
+    const sweep = blocked ? ccw - 360 : ccw, a = ((a0 + sweep * f) * Math.PI) / 180;
+    return [mp.centre[0] + mp.R * Math.cos(a), mp.centre[1] + mp.R * Math.sin(a)];
   }
-  function drawNet() {
-    let g;
-    try { g = RC.applyAlg(new Cube(), RC.parseAlg($('algA').value)); } catch (e) { return; }   // invalid text: keep last drawing
-    ringAnim.k = 0; ringAnim.t = 0; ringAnim.mode = 'idle';
-    buildRings(g); renderRings();
+
+  // anim = {m, u}: move index and progress in [0, 1]; omitted = static view of `state`
+  function renderRings(anim) {
+    const fl = RC.toFacelets(state), hl = $('chkHighlight').checked, ok = hl ? solvedMask() : null;
+    const mp = anim ? MOVE_PATHS[anim.m] : null, pos = SLOT_POS.map((p) => p), svg = [];
+    if (mp) {
+      const turns = mp.paths[0].length - 1, uu = Math.min(anim.u, 0.9999) * turns, seg = Math.floor(uu), f = uu - seg;
+      mp.paths.forEach((sl) => { pos[sl[0]] = slidePoint(mp, sl[seg], sl[seg + 1], f); });
+    }
+    for (let a = 0; a < 3; a++) for (const layer of [-1, 0, 1]) {
+      const active = mp && mp.g === a && mp.layer === layer;
+      svg.push(`<circle cx="${RG_CENTERS[a][0]}" cy="${RG_CENTERS[a][1]}" r="${ringRadius(layer)}" fill="none" stroke="${RG_STROKE[a]}" stroke-width="${active ? 0.1 : 0.035}" opacity="${active ? 1 : 0.5}"/>`);
+    }
+    const moving = mp ? new Set(mp.paths.map((p) => p[0])) : null;
+    // static dots first, moving ones on top
+    for (const pass of [false, true]) FACELETS.forEach((_, i) => {
+      if (!!(moving && moving.has(i)) !== pass) return;
+      svg.push(`<circle cx="${pos[i][0]}" cy="${pos[i][1]}" r="${RG.dotR}" fill="${CSS_COLORS[fl[i]]}" stroke="#0b0b0d" stroke-width="0.04" opacity="${ok && ok[i] ? 0.35 : 1}"/>`);
+    });
+    [...FACE_LETTERS].forEach((f) => {
+      const c = faceCentre(f), dx = c[0] - diagramMid[0], dy = c[1] - diagramMid[1], len = Math.hypot(dx, dy) || 1;
+      svg.push(`<text x="${c[0] + (dx / len) * 1.15}" y="${c[1] + (dy / len) * 1.15}" fill="#e6e8ee" font-size="0.6" font-weight="700" text-anchor="middle" dominant-baseline="middle">${f}</text>`);
+    });
+    $('net').innerHTML = svg.join('');
   }
-  $('algA').addEventListener('input', drawNet);
-  $('btnRingStep').onclick = () => { if (ringAnim.mode === 'idle') startRings('step'); };
-  $('btnRingPlay').onclick = () => startRings(ringAnim.mode === 'play' ? 'step' : 'play');
-  $('btnRingReset').onclick = () => { ringAnim.k = 0; ringAnim.t = 0; ringAnim.mode = 'idle'; renderRings(); };
+  function animateRings(m, dur) {
+    return new Promise((resolve) => {
+      if (dur <= 0) return resolve();
+      const t0 = performance.now(), len = dur * (m % 3 === 1 ? 1.5 : 1);
+      (function tick(now) {
+        const t = Math.min(1, (now - t0) / len), e = t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
+        renderRings({ m, u: e });
+        if (t < 1) requestAnimationFrame(tick); else resolve();
+      })(t0);
+    });
+  }
 
   // =========================================================== algorithm explorer
   let powers = [];
@@ -452,5 +462,5 @@
     setState(powers[k].clone());
   };
 
-  updateColors(); refresh(); renderSolution(); drawNet();
+  updateColors(); refresh(); renderSolution();
 })();

@@ -8,7 +8,7 @@ A Rubik's cube simulator, a two-phase (Kociemba) solver and a visualizer for the
 
 - **3D simulator** (three.js): all 18 face turns, animation, random scramble and uniformly random state.
 - **Two-phase solver**: uses the chain `G ⊃ H = ⟨U, D, R2, L2, F2, B2⟩`. Solutions of about 20 moves in roughly 1 s.
-- **Group visualizer**: cycles, element order, invariants (twist, flip, parity), the subgroup chain G₀ ⊃ G₁ ⊃ G₂ ⊃ G₃ ⊃ {e}, commutators, conjugates and powers g^k.
+- **Group visualizer**: cycles, element order, invariants (twist, flip, parity), the subgroup chain G₀ ⊃ G₁ ⊃ G₂ ⊃ G₃ ⊃ {e}, commutators, conjugates and powers g^k, plus a "nine rings" diagram: three families of three concentric circles (one per axis) with each face at a crossing, where a face turn slides its layer's 12 stickers along one circle.
 
 ## Model
 
