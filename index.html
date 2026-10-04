@@ -66,7 +66,7 @@
 </header>
 <main>
   <div class="col">
-    <section id="stage"><div class="hint">drag to rotate the view · keys U R F D L B (Shift = inverse)</div></section>
+    <section id="stage"><div class="hint">drag a sticker to turn that layer · drag the background to rotate the view · keys U R F D L B (Shift = inverse)</div></section>
 
     <section>
       <h2>Generators (face turns)</h2>
@@ -75,6 +75,8 @@
         <button id="btnScramble">Scramble (25)</button>
         <button id="btnRandom">Uniform random state</button>
         <button id="btnReset">Reset (solved)</button>
+        <button id="btnUndo">Undo</button>
+        <button id="btnResetView">Reset view</button>
         <label><input type="checkbox" id="chkHighlight"> highlight misplaced pieces</label>
       </div>
       <div class="row"><label style="flex:1">speed <input type="range" id="speed" min="0" max="100" value="70"></label></div>
@@ -141,7 +143,12 @@
 
     <section>
       <h2>Sticker rings of algorithm A</h2>
-      <svg id="net" viewBox="-5.6 -5.6 11.2 11.2" style="width:100%;max-width:520px;display:block;margin:0 auto"></svg>
+      <svg id="net" viewBox="-6.4 -6.4 12.8 12.8" style="width:100%;max-width:520px;display:block;margin:0 auto"></svg>
+      <div class="row" style="justify-content:center">
+        <button id="btnRingStep">Step A ▸</button>
+        <button id="btnRingPlay">Play ⟳</button>
+        <button id="btnRingReset">Reset</button>
+      </div>
       <div class="msg" id="netMsg"></div>
     </section>
 
